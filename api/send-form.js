@@ -2,25 +2,26 @@ import nodemailer from "nodemailer"
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ message: "Only POST allowed" })
+    return res.status(405).json({ message: "Only POST requests allowed" })
   }
 
   const { name, email, message } = req.body
 
-  const notionToken = process.env.NOTION_TOKEN
-  const databaseId = process.env.NOTION_DATABASE_ID
+  if (!name || !email || !message) {
+    return res.status(400).json({ success: false, error: "Missing required fields" })
+  }
 
-  // 👉 Guardar en Notion
+  // Guardar en Notion
   try {
-    await fetch("https://api.notion.com/v1/pages", {
+    const notionResponse = await fetch("https://api.notion.com/v1/pages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${notionToken}`,
+        Authorization: `Bearer ${process.env.NOTION_TOKEN}`,
         "Content-Type": "application/json",
         "Notion-Version": "2022-06-28"
       },
       body: JSON.stringify({
-        parent: { database_id: databaseId },
+        parent: { database_id: process.env.NOTION_DATABASE_ID },
         properties: {
           Nombre: {
             title: [{ text: { content: name } }]
@@ -30,16 +31,23 @@ export default async function handler(req, res) {
           },
           Mensaje: {
             rich_text: [{ text: { content: message } }]
+          },
+          Date: {
+            date: { start: new Date().toISOString() }
           }
         }
       })
     })
+
+    if (!notionResponse.ok) {
+      throw new Error(`Notion API error: ${notionResponse.statusText}`)
+    }
   } catch (error) {
-    console.error("Error al guardar en Notion:", error)
-    return res.status(500).json({ success: false, error: "Error en Notion" })
+    console.error("❌ Error en Notion:", error)
+    return res.status(500).json({ success: false, error: "Error al guardar en Notion" })
   }
 
-  // 👉 Enviar correos
+  // Enviar emails
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -59,7 +67,7 @@ export default async function handler(req, res) {
     from: process.env.MAIL_USER,
     to: email,
     subject: "Gracias por tu contacto 🙌",
-    text: `Hola ${name},\n\nGracias por escribirnos. Ya recibimos tu mensaje y vamos a contactarte muy pronto.\n\n— El equipo de [Tu Marca]`
+    text: `Hola ${name},\n\nGracias por escribirnos. Ya recibimos tu mensaje y vamos a contactarte muy pronto.\n\n— El equipo de Abllle`
   }
 
   try {
@@ -67,7 +75,7 @@ export default async function handler(req, res) {
     await transporter.sendMail(toLead)
     res.status(200).json({ success: true })
   } catch (error) {
-    console.error("Error al enviar mail:", error)
+    console.error("❌ Error al enviar mails:", error)
     res.status(500).json({ success: false, error: "Error al enviar correos" })
   }
 }
