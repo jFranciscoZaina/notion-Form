@@ -14,18 +14,28 @@ export default async function handler(req, res) {
 
   res.setHeader("Access-Control-Allow-Origin", "*")
 
+  const { name, email, message } = req.body
+
+  if (!name || !email || !message) {
+    console.error("❌ Campos incompletos:", req.body)
+    return res.status(400).json({ success: false, error: "Missing required fields" })
+  }
+
+  const notionToken = process.env.NOTION_TOKEN
+  const databaseId = process.env.NOTION_DATABASE_ID
 
   // Guardar en Notion
   try {
-    const notionResponse = await fetch("https://api.notion.com/v1/pages", {
+    console.log("📦 Enviando datos a Notion...")
+    const notionRes = await fetch("https://api.notion.com/v1/pages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.NOTION_TOKEN}`,
+        Authorization: `Bearer ${notionToken}`,
         "Content-Type": "application/json",
         "Notion-Version": "2022-06-28"
       },
       body: JSON.stringify({
-        parent: { database_id: process.env.NOTION_DATABASE_ID },
+        parent: { database_id: databaseId },
         properties: {
           Nombre: {
             title: [{ text: { content: name } }]
@@ -43,15 +53,18 @@ export default async function handler(req, res) {
       })
     })
 
-    if (!notionResponse.ok) {
-      throw new Error(`Notion API error: ${notionResponse.statusText}`)
+    if (!notionRes.ok) {
+      const text = await notionRes.text()
+      console.error("❌ Error en Notion:", text)
+      return res.status(500).json({ success: false, error: "Notion error" })
     }
+    console.log("✅ Notion: fila creada")
   } catch (error) {
-    console.error("❌ Error en Notion:", error)
+    console.error("❌ Catch Notion:", error)
     return res.status(500).json({ success: false, error: "Error al guardar en Notion" })
   }
 
-  // Enviar emails
+  // Enviar correos
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -60,23 +73,25 @@ export default async function handler(req, res) {
     }
   })
 
-  const toAdmin = {
-    from: process.env.MAIL_USER,
-    to: process.env.MAIL_RECEIVER,
-    subject: "Nuevo lead recibido",
-    text: `Nombre: ${name}\nEmail: ${email}\nMensaje: ${message}`
-  }
-
-  const toLead = {
-    from: process.env.MAIL_USER,
-    to: email,
-    subject: "Gracias por tu contacto 🙌",
-    text: `Hola ${name},\n\nGracias por escribirnos. Ya recibimos tu mensaje y vamos a contactarte muy pronto.\n\n— El equipo de Abllle`
-  }
-
   try {
-    await transporter.sendMail(toAdmin)
-    await transporter.sendMail(toLead)
+    console.log("📬 Enviando mail al admin...")
+    await transporter.sendMail({
+      from: process.env.MAIL_USER,
+      to: process.env.MAIL_RECEIVER,
+      subject: "Nuevo lead recibido",
+      text: `Nombre: ${name}\nEmail: ${email}\nMensaje: ${message}`
+    })
+    console.log("✅ Mail admin enviado")
+
+    console.log("📨 Enviando mail al usuario...")
+    await transporter.sendMail({
+      from: process.env.MAIL_USER,
+      to: email,
+      subject: "Gracias por tu contacto 🙌",
+      text: `Hola ${name},\n\nGracias por escribirnos. Ya recibimos tu mensaje y vamos a contactarte muy pronto.\n\n— El equipo de Abllle`
+    })
+    console.log("✅ Mail usuario enviado")
+
     res.status(200).json({ success: true })
   } catch (error) {
     console.error("❌ Error al enviar mails:", error)
