@@ -1,18 +1,14 @@
 const { Client } = require("@notionhq/client")
 
-const notion = new Client({
-  auth: process.env.NOTION_TOKEN,
-})
-
+const notion = new Client({ auth: process.env.NOTION_TOKEN })
 const databaseId = process.env.NOTION_DB_ID
 
 export default async function handler(req, res) {
-  // ✅ Encabezados CORS
+  // Habilitar CORS
   res.setHeader("Access-Control-Allow-Origin", "*")
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type")
 
-  // ✅ Preflight check
   if (req.method === "OPTIONS") {
     res.status(200).end()
     return
