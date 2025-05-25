@@ -1,37 +1,48 @@
 export default async function handler(req, res) {
-    const NOTION_API_KEY = process.env.NOTION_API_KEY
-    const DATABASE_ID = process.env.NOTION_DATABASE_ID
+  if (req.method === "OPTIONS") {
+    res.setHeader("Access-Control-Allow-Origin", "*")
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+    return res.status(200).end()
+  }
 
-    const url = `https://api.notion.com/v1/databases/${DATABASE_ID}/query`
+  if (req.method !== "GET") {
+    return res.status(405).json({ message: "Only GET requests allowed" })
+  }
 
-    try {
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${NOTION_API_KEY}`,
-                "Content-Type": "application/json",
-                "Notion-Version": "2022-06-28",
-            },
-        })
+  res.setHeader("Access-Control-Allow-Origin", "*")
 
-        const data = await response.json()
+  try {
+    const notionResponse = await fetch(
+      `https://api.notion.com/v1/databases/${process.env.NOTION_DATABASE_ID}/query`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.NOTION_TOKEN}`,
+          "Content-Type": "application/json",
+          "Notion-Version": "2022-06-28",
+        },
+      }
+    )
 
-        const results = data.results.map((page) => {
-            return {
-                url:
-                    page.properties["Fragmento URL"]?.url ??
-                    page.properties["Fragmento URL"]?.rich_text?.[0]?.plain_text ??
-                    "",
-                pass:
-                    page.properties["Credencial"]?.rich_text?.[0]?.plain_text ??
-                    "",
-            }
-        })
+    const data = await notionResponse.json()
 
-        console.log("✅ Datos extraídos desde Notion:", results)
-        res.status(200).json(results)
-    } catch (error) {
-        console.error("❌ Error al consultar Notion:", error)
-        res.status(500).json({ error: "Error al consultar Notion" })
+    if (!notionResponse.ok) {
+      console.error("❌ Notion error:", data)
+      return res.status(500).json({ error: "Error al consultar Notion" })
     }
+
+    const result = data.results.map((page) => {
+      const props = page.properties
+      return {
+        url: props.URL?.url || null,
+        pass: props.Pass?.rich_text?.[0]?.text?.content || null,
+      }
+    })
+
+    return res.status(200).json(result)
+  } catch (error) {
+    console.error("❌ Error general:", error)
+    return res.status(500).json({ error: "Error al consultar Notion" })
+  }
 }
