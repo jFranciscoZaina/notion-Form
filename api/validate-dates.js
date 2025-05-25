@@ -7,18 +7,17 @@ const notion = new Client({
 const databaseId = process.env.NOTION_DB_ID
 
 export default async function handler(req, res) {
-  // ✅ Agregar estos encabezados
+  // ✅ Encabezados CORS
   res.setHeader("Access-Control-Allow-Origin", "*")
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type")
 
-  // ✅ Manejar el preflight (cuando el método es OPTIONS)
+  // ✅ Preflight check
   if (req.method === "OPTIONS") {
     res.status(200).end()
     return
   }
 
-  // ✅ Tu lógica original para conectarte a Notion
   try {
     const response = await notion.databases.query({ database_id: databaseId })
 
@@ -39,7 +38,7 @@ export default async function handler(req, res) {
 
     res.status(200).json(items)
   } catch (error) {
-    console.error("Error fetching data from Notion:", error)
+    console.error("Error fetching Notion data:", error)
     res.status(500).json({ error: "Failed to fetch Notion data" })
   }
 }
