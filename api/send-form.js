@@ -37,7 +37,9 @@ export default async function handler(req, res) {
           Email: { email: email },
           Company: { rich_text: [{ text: { content: company } }] },
           Category: { rich_text: [{ text: { content: category } }] },
-          "Kind of service": { select: { name: service } },
+          "Kind of service": {
+  multi_select: [{ name: service }],
+},
           "First touch": { date: { start: isoDate } },
           // You can add other fields here if needed
         },
